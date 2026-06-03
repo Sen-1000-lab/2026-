@@ -17,8 +17,6 @@
         .event-name { font-size: 0.85rem; color: #666; margin-top: 4px; }
         .danger-box { background: #f8d7da; color: #dc3545; font-weight: bold; text-align: center; padding: 20px; border-radius: 8px; border: 1px solid #f5c6cb; }
     </style>
-    <script src="https://cloudflare.com"></script>
-    <script src="https://jsdelivr.net"></script>
 </head>
 <body>
 
@@ -28,7 +26,6 @@
         <div class="hint-text">✨ 全校舎を再現！指やマウスでグリグリ回して、見たい階をタップしてな</div>
     </div>
 
-    <!-- 情報表示エリア（検索窓を追加） -->
     <div id="info-container">
         <div style="margin-bottom: 15px; display: flex; gap: 8px;">
             <input type="text" id="search-input" placeholder="クラス名や出し物（例: M3A, 食堂）を入力..." oninput="searchEvent()" style="flex: 1; padding: 10px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.95rem; outline: none; box-sizing: border-box;">
@@ -41,7 +38,155 @@
         </div>
     </div>
 
+    <!-- ここに3Dを動かすプログラムの最小コアを直接埋め込みます -->
     <script>
+        // 簡単な3D描写を行うミニマムエンジン（外部通信を100%遮断するための自作3D）
+        const ThreeShim = {
+            createScene: function(container) {
+                const canvas = document.createElement('canvas');
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                container.appendChild(canvas);
+                const ctx = canvas.getContext('2d');
+                
+                let width = canvas.width = container.clientWidth;
+                let height = canvas.height = container.clientHeight;
+                
+                let angleX = -0.5, angleY = 0.6, scale = 1.0;
+                let isDragging = false, previousMousePosition = { x: 0, y: 0 };
+                
+                // 3D空間のオブジェクト定義
+                const objects = [
+                    { id: "PP棟-1F", name: "PP棟", x: -140, z: -20, w: 40, h: 20, d: 30, color: "#ff99bb", floors: 1 },
+                    { id: "P棟-1F", name: "P棟", x: -80, z: -20, w: 40, h: 20, d: 30, color: "#ffaa44", floors: 1 },
+                    { id: "M棟-1F", name: "M棟", x: -20, z: -20, w: 40, h: 20, d: 30, color: "#4285f4", floors: 4 },
+                    { id: "C棟-1F", name: "C棟", x: 30, z: -20, w: 40, h: 20, d: 30, color: "#ea4335", floors: 4 },
+                    { id: "Y棟-1F", name: "Y棟", x: 80, z: -20, w: 40, h: 20, d: 30, color: "#34a853", floors: 5 },
+                    { id: "グラウンド", name: "総合グラウンド", x: 140, z: -60, w: 100, h: 5, d: 100, color: "#e5cfa3", floors: 1, isGround: true }
+                ];
+
+                function project(x, y, z) {
+                    let radX = angleX, radY = angleY;
+                    let cosX = Math.cos(radX), sinX = Math.sin(radX);
+                    let cosY = Math.cos(radY), sinY = Math.sin(radY);
+                    
+                    let x1 = x * cosY - z * sinY;
+                    let z1 = x * sinY + z * cosY;
+                    
+                    let y2 = y * cosX - z1 * sinX;
+                    let z2 = y * sinX + z1 * cosX;
+                    
+                    let zoom = 300 / (300 + z2);
+                    return {
+                        x: width / 2 + x1 * zoom * scale,
+                        y: height / 2 - y2 * zoom * scale,
+                        depth: z2
+                    };
+                }
+
+                function drawCube(ctx, obj, floorIdx) {
+                    let hOffset = floorIdx * 25;
+                    let h = obj.isGround ? obj.h : 22;
+                    let curId = obj.isGround ? obj.id : obj.id.replace("1F", (floorIdx+1)+"F");
+                    let isSelected = currentSelectedId === curId;
+                    
+                    let color = isSelected ? "#fbbc05" : obj.color;
+                    
+                    let vertices = [
+                        {x: obj.x, y: hOffset, z: obj.z},
+                        {x: obj.x + obj.w, y: hOffset, z: obj.z},
+                        {x: obj.x + obj.w, y: hOffset + h, z: obj.z},
+                        {x: obj.x, y: hOffset + h, z: obj.z},
+                        {x: obj.x, y: hOffset, z: obj.z + obj.d},
+                        {x: obj.x + obj.w, y: hOffset, z: obj.z + obj.d},
+                        {x: obj.x + obj.w, y: hOffset + h, z: obj.z + obj.d},
+                        {x: obj.x, y: hOffset + h, z: obj.z + obj.d}
+                    ];
+                    
+                    let proj = vertices.map(v => project(v.x, v.y, v.z));
+                    let faces = [, [1, 5, 6, 2], [5, 4, 7, 6],
+, [3, 2, 6, 7], [4, 5, 1, 0]
+                    ];
+                    
+                    faces.forEach(face => {
+                        ctx.beginPath();
+                        ctx.moveTo(proj[face[0]].x, proj[face[0]].y);
+                        for(let i=1; i<4; i++) ctx.lineTo(proj[face[i]].x, proj[face[i]].y);
+                        ctx.closePath();
+                        ctx.fillStyle = color;
+                        ctx.fill();
+                        ctx.strokeStyle = "#ffffff";
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    });
+                    
+                    return { id: curId, proj: proj };
+                }
+
+                let drawnElements = [];
+                function render() {
+                    ctx.clearRect(0, 0, width, height);
+                    
+                    // 背景の地面
+                    ctx.fillStyle = "#88cc66";
+                    ctx.fillRect(0, 0, width, height);
+                    
+                    drawnElements = [];
+                    objects.forEach(obj => {
+                        for(let f=0; f<obj.floors; f++) {
+                            let el = drawCube(ctx, obj, f);
+                            drawnElements.push(el);
+                        }
+                    });
+                }
+
+                container.addEventListener('mousedown', e => { isDragging = true; previousMousePosition = { x: e.clientX, y: e.clientY }; });
+                window.addEventListener('mouseup', () => isDragging = false);
+                container.addEventListener('mousemove', e => {
+                    if (!isDragging) return;
+                    let deltaX = e.clientX - previousMousePosition.x;
+                    let deltaY = e.clientY - previousMousePosition.y;
+                    angleY += deltaX * 0.01;
+                    angleX += deltaY * 0.01;
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                    render();
+                });
+                
+                container.addEventListener('click', e => {
+                    let rect = canvas.getBoundingClientRect();
+                    let clickX = e.clientX - rect.left;
+                    let clickY = e.clientY - rect.top;
+                    
+                    // 簡易クリック判定（上にある階層から優先）
+                    for(let i = drawnElements.length - 1; i >= 0; i--) {
+                        let el = drawnElements[i];
+                        let xs = el.proj.map(p => p.x), ys = el.proj.map(p => p.y);
+                        let minX = Math.min(...xs), maxX = Math.max(...xs);
+                        let minY = Math.min(...ys), maxY = Math.max(...ys);
+                        
+                        if(clickX >= minX && clickX <= maxX && clickY >= minY && clickY <= maxY) {
+                            currentSelectedId = el.id;
+                            render();
+                            if(window.updateInfo) window.updateInfo(el.id);
+                            break;
+                        }
+                    }
+                });
+
+                window.addEventListener('resize', () => {
+                    width = canvas.width = container.clientWidth;
+                    height = canvas.height = container.clientHeight;
+                    render();
+                });
+
+                render();
+            }
+        };
+        
+        let currentSelectedId = null;
+        window.addEventListener('DOMContentLoaded', () => {
+            ThreeShim.createScene(document.getElementById('canvas-container'));
+        });
         // --- すべての棟・すべての階のデータを完全網羅 ---
         const floorData = {
             "PP棟-1F": { title: "PP棟 (幼稚園) 1階", rooms: [ {n:"玄関ホール", e:"天窓のある明るいバリアフリーエントランス"}, {n:"保健室", e:"可動式間仕切りの広々オープンスペース"}, {n:"絵本のお部屋", e:"畳敷きのゆったり読書空間"}, {n:"光庭", e:"高さ2m、243個の岩があるロッククライミング"}, {n:"遊戯室", e:"約180㎡の可動式ステージ付きホール"}, {n:"棚田・ビオトープ", e:"自然と触れ合える体験スペース"} ] },
@@ -67,113 +212,6 @@
             "グラウンド": { title: "総合グラウンド", rooms: [ {n:"模擬店エリア", e:"各種クラス・部活の模擬店テント"}, {n:"サッカー場", e:"天然芝の広大なフィールド"}, {n:"陸上トラック", e:"周回480mのタータントラック"}, {n:"テニスコート", e:"オムニコート6面・壁打ち練習場"}, {n:"クラブハウス", e:"屋根付きの南側観覧席"} ] }
         };
 
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xcce0ff);
-
-        const camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100);
-        camera.position.set(-6, 12, 22);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(container.clientWidth, container.clientHeight);
-        container.appendChild(renderer.domElement);
-
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.target.set(0, 1.5, 0);
-
-        scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.55);
-        dirLight.position.set(25, 35, 15);
-        scene.add(dirLight);
-
-        // 地面
-        const groundGeo = new THREE.PlaneGeometry(36, 36);
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x88cc66, roughness: 0.9 });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
-        ground.rotation.x = -Math.PI / 2;
-        scene.add(ground);
-
-        // プロムナード
-        const roadGeo = new THREE.PlaneGeometry(2.5, 24);
-        const roadMat = new THREE.MeshStandardMaterial({ color: 0xe0e0e0 });
-        const road = new THREE.Mesh(roadGeo, roadMat);
-        road.rotation.x = -Math.PI / 2;
-        road.position.set(-1, 0.01, 6);
-        scene.add(road);
-
-        const clickableObjects = [];
-
-        // 総合グラウンド
-        const grandGeo = new THREE.BoxGeometry(11, 0.3, 11);
-        const grandMat = new THREE.MeshStandardMaterial({ color: 0xe5cfa3, roughness: 0.8 });
-        const grandMesh = new THREE.Mesh(grandGeo, grandMat);
-        grandMesh.position.set(8, 0.15, -4);
-        grandMesh.userData = { id: "グラウンド", color: 0xe5cfa3 };
-        scene.add(grandMesh);
-        clickableObjects.push(grandMesh);
-
-        const trackGeo = new THREE.BoxGeometry(9, 0.02, 9);
-        const trackMat = new THREE.MeshStandardMaterial({ color: 0xcc6655 });
-        const track = new THREE.Mesh(trackGeo, trackMat);
-        track.position.set(0, 0.16, 0);
-        grandMesh.add(track);
-
-        // 校舎ビルディング生成関数
-        function buildFloorBlock(buildingName, x, z, floorNum, colorHex) {
-            const geometry = new THREE.BoxGeometry(2.4, 0.55, 1.8);
-            const material = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
-            const mesh = new THREE.Mesh(geometry, material);
-            
-            mesh.position.set(x, (floorNum - 1) * 0.65 + 0.28, z);
-            mesh.userData = { id: `${buildingName}-${floorNum}F`, color: colorHex };
-            
-            scene.add(mesh);
-            clickableObjects.push(mesh);
-
-            const edges = new THREE.EdgesGeometry(geometry);
-            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
-            mesh.add(line);
-        }
-
-        // 各棟の配置
-        buildFloorBlock("PP棟", -8.5, -1, 1, 0xff99bb);
-        buildFloorBlock("P棟", -5.5, -1, 1, 0xffaa44);
-        for(let f=1; f<=4; f++) buildFloorBlock("M棟", -2.5, -1, f, 0x4285f4);
-        for(let f=1; f<=4; f++) buildFloorBlock("C棟", 0.5, -1, f, 0xea4335);
-        for(let f=1; f<=5; f++) buildFloorBlock("Y棟", 3.5, -1, f, 0x34a853);
-
-        // ループアニメーション
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
-        animate();
-
-        // タップイベント
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-
-        container.addEventListener('click', (event) => {
-            const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(clickableObjects);
-
-            clickableObjects.forEach(obj => obj.material.color.setHex(obj.userData.color));
-
-            if (intersects.length > 0) {
-                const target = intersects.object;
-                target.material.color.setHex(0xfbbc05);
-                updateInfo(target.userData.id);
-            }
-        });
-
-        // 情報更新
-        function updateInfo(id) {
         // 情報更新
         function updateInfo(id) {
             const data = floorData[id];
@@ -238,9 +276,6 @@
                 infoContent.innerHTML = resultsHtml;
             }
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
-        });
+    </script>
+</body>
+</html>
