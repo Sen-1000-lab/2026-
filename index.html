@@ -3,44 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>奈良学園登美ヶ丘 3D完全キャンパスマップ</title>
+    <title>奈良学園登美ヶ丘 3D完全ナビサイト</title>
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
-        header { background-color: #1a73e8; color: white; text-align: center; padding: 10px; font-weight: bold; font-size: 1.1rem; z-index: 10; }
+        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; overflow: hidden; display: flex; height: 100vh; }
+        
+        /* ◀ 左側の全画面サイドメニュー ◀ */
+        #sidebar { width: 220px; background-color: #1a73e8; color: white; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 20; }
+        .sidebar-header { padding: 20px 15px; text-align: center; font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.2); }
+        .menu-btn { background: none; border: none; color: white; padding: 15px 20px; text-align: left; font-size: 1rem; cursor: pointer; transition: 0.2s; width: 100%; }
+        .menu-btn:hover, .menu-btn.active { background-color: rgba(255,255,255,0.15); font-weight: bold; }
+        
+        /* メインコンテンツ表示エリア */
+        #main-content { flex: 1; display: flex; flex-direction: column; position: relative; height: 100vh; overflow: hidden; }
+        .page-section { display: none; width: 100%; height: 100%; box-sizing: border-box; }
+        .page-section.active { display: flex; flex-direction: column; }
+        
+        /* 各ページのスタイル */
+        .scroll-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .page-title { font-size: 1.4rem; font-weight: bold; color: #1a73e8; margin-bottom: 20px; border-bottom: 3px solid #e8f0fe; padding-bottom: 5px; }
+        
+        /* 3D・検索用エリア */
         #canvas-container { flex: 1; width: 100%; background: #cce0ff; position: relative; }
         .hint-text { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; pointer-events: none; }
-        #info-container { height: 40vh; background: white; box-shadow: 0 -4px 10px rgba(0,0,0,0.1); padding: 15px; box-sizing: border-box; overflow-y: auto; z-index: 10; border-top-left-radius: 16px; border-top-right-radius: 16px; }
-        .floor-title { font-size: 1.3rem; font-weight: bold; color: #1a73e8; border-bottom: 3px solid #e8f0fe; padding-bottom: 5px; margin-bottom: 15px; }
+        #info-sub-panel { height: 35vh; background: white; border-top: 1px solid #dee2e6; padding: 15px; overflow-y: auto; }
+        
+        /* カードデザイン */
         .room-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .room-card { background: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; border-radius: 8px; text-align: center; }
-        .room-name { font-weight: bold; font-size: 1.1rem; color: #333; }
+        .room-name { font-weight: bold; color: #333; }
         .event-name { font-size: 0.85rem; color: #666; margin-top: 4px; }
-        .danger-box { background: #f8d7da; color: #dc3545; font-weight: bold; text-align: center; padding: 20px; border-radius: 8px; border: 1px solid #f5c6cb; }
+        
+        /* 状況（タイムライン）ページ用スタイル */
+        .status-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 6px solid #1a73e8; }
+        .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .gym-title { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .delay-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; color: white; }
+        .delay-plus { background-color: #dc3545; }  /* 遅れ */
+        .delay-minus { background-color: #28a745; } /* 巻き */
+        .delay-none { background-color: #6c757d; }  /* オンタイム */
+        .current-program { background: #f8f9fa; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1.05rem; border: 1px dashed #dee2e6; }
     </style>
 </head>
 <body>
 
-    <header>🏫 奈良学園登美ヶ丘 3D学園祭総合ナビ</header>
-    
-    <div id="canvas-container">
-        <div class="hint-text">✨ 全校舎を再現！指やマウスでグリグリ回して、見たい階をタップしてな</div>
+    <!-- 左側サイドメニュー -->
+    <div id="sidebar">
+        <div class="sidebar-header">尚志祭 総合ナビ</div>
+        <button class="menu-btn active" onclick="switchPage('home')">🏠 Home</button>
+        <button class="menu-btn" onclick="switchPage('map3d')">✨ 3Dマップ</button>
+        <button class="menu-btn" onclick="switchPage('search')">🔍 出し物検索</button>
+        <button class="menu-btn" onclick="switchPage('status')">⏱️ ステージ状況</button>
     </div>
 
-    <div id="info-container">
-        <div style="margin-bottom: 15px; display: flex; gap: 8px;">
-            <input type="text" id="search-input" placeholder="クラス名や出し物（例: M3A, 食堂）を入力..." oninput="searchEvent()" style="flex: 1; padding: 10px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.95rem; outline: none; box-sizing: border-box;">
+    <!-- 右側コンテンツエリア -->
+    <div id="main-content">
+        
+        <!-- ① HOME ページ -->
+        <div id="page-home" class="page-section active">
+            <div class="scroll-body">
+                <div class="page-title">奈良学園登美ヶ丘 文化祭へようこそ！</div>
+                <p>左側のメニューから、見たいコンテンツをタッチしてな！</p>
+                <div class="status-card" style="border-left-color: #ffaa44;">
+                    <div class="gym-title">💡 おすすめの使い方</div>
+                    <p style="font-size: 0.9rem; color: #555; line-height: 1.5;">
+                        ・<b>3Dマップ</b>：校舎のブロックを直接触って、教室の出し物を確認できます！<br>
+                        ・<b>出し物検索</b>：クラス名や見たい企画を文字で一発検索できます！<br>
+                        ・<b>ステージ状況</b>：P体育館・MY体育館の現在の進行状況や、プログラムの「何分遅れ」をリアルタイムで確認できます！
+                    </p>
+                </div>
+            </div>
         </div>
-        <div id="info-content">
-            <p style="text-align: center; color: #666; margin-top: 20px;">
-                上の3Dマップを動かして、見たい校舎の階やグラウンドをタップしてな！<br>
-                下の検索窓に文字を入れて直接出し物を探すこともできるで！
-            </p>
-        </div>
-    </div>
 
-    <!-- ここに3Dを動かすプログラムの最小コアを直接埋め込みます -->
+        <!-- ② 3Dマップ ページ -->
+        <div id="page-map3d" class="page-section">
+            <div id="canvas-container">
+                <div class="hint-text">✨ 敷地をグリグリ回して、見たい階やグラウンドをタップしてな</div>
+            </div>
+            <div id="info-sub-panel">
+                <div id="info-content-3d">
+                    <p style="text-align: center; color: #666; margin-top: 20px;">上の3Dモデルの校舎をタップすると、ここにフロアの詳細が表示されるで！</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ③ 検索 ページ -->
+        <div id="page-search" class="page-section">
+            <div class="scroll-body">
+                <div class="page-title">出し物検索</div>
+                <input type="text" id="search-input" placeholder="クラス名や出し物（例: M3A, 食堂）を入力..." oninput="searchEvent()" style="width: 100%; padding: 12px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 1rem; outline: none; box-sizing: border-box; margin-bottom: 20px;">
+                <div id="info-content-search">
+                    <p style="text-align: center; color: #666;">ここに検索結果が表示されるで！</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ④ 状況（タイムライン） ページ -->
+        <div id="page-status" class="page-section">
+            <div class="scroll-body">
+                <div class="page-title">ステージ進行状況（リアルタイム）</div>
+                
+                <!-- P体育館 -->
+                <div class="status-card">
+                    <div class="status-header">
+                        <div class="gym-title">P体育館（小学校側）</div>
+                        <div id="p-badge" class="delay-badge delay-none">オンタイム</div>
+                    </div>
+                    <p>【現在進行中のプログラム】</p>
+                    <div id="p-current" class="current-program">読み込み中...</div>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 10px;" id="p-next">次：予定なし</p>
+                </div>
+
+                <!-- MY体育館 -->
+                <div class="status-card" style="border-left-color: #28a745;">
+                    <div class="status-header">
+                        <div class="gym-title">MY体育館（中高側）</div>
+                        <div id="my-badge" class="delay-badge delay-none">オンタイム</div>
+                    </div>
+                    <p>【現在進行中のプログラム】</p>
+                    <div id="my-current" class="current-program">読み込み中...</div>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 10px;" id="my-next">次：予定なし</p>
+                </div>
+                
+            </div>
+        </div>
+
+    </div>
+    <!-- 3Dエンジンの読み込み（バグ回避のため前半で展開した自作軽量版） -->
     <script>
-        // 簡単な3D描写を行うミニマムエンジン（外部通信を100%遮断するための自作3D）
+        // メニューの切り替え処理
+        function switchPage(pageId) {
+            document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.menu-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById('page-' + pageId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        // --- 3D描写システム ---
         const ThreeShim = {
             createScene: function(container) {
                 const canvas = document.createElement('canvas');
@@ -55,7 +154,6 @@
                 let angleX = -0.5, angleY = 0.6, scale = 1.0;
                 let isDragging = false, previousMousePosition = { x: 0, y: 0 };
                 
-                // 3D空間のオブジェクト定義
                 const objects = [
                     { id: "PP棟-1F", name: "PP棟", x: -140, z: -20, w: 40, h: 20, d: 30, color: "#ff99bb", floors: 1 },
                     { id: "P棟-1F", name: "P棟", x: -80, z: -20, w: 40, h: 20, d: 30, color: "#ffaa44", floors: 1 },
@@ -66,77 +164,47 @@
                 ];
 
                 function project(x, y, z) {
-                    let radX = angleX, radY = angleY;
-                    let cosX = Math.cos(radX), sinX = Math.sin(radX);
-                    let cosY = Math.cos(radY), sinY = Math.sin(radY);
-                    
+                    let cosX = Math.cos(angleX), sinX = Math.sin(angleX);
+                    let cosY = Math.cos(angleY), sinY = Math.sin(angleY);
                     let x1 = x * cosY - z * sinY;
                     let z1 = x * sinY + z * cosY;
-                    
                     let y2 = y * cosX - z1 * sinX;
                     let z2 = y * sinX + z1 * cosX;
-                    
                     let zoom = 300 / (300 + z2);
-                    return {
-                        x: width / 2 + x1 * zoom * scale,
-                        y: height / 2 - y2 * zoom * scale,
-                        depth: z2
-                    };
+                    return { x: width / 2 + x1 * zoom * scale, y: height / 2 - y2 * zoom * scale };
                 }
 
                 function drawCube(ctx, obj, floorIdx) {
                     let hOffset = floorIdx * 25;
                     let h = obj.isGround ? obj.h : 22;
                     let curId = obj.isGround ? obj.id : obj.id.replace("1F", (floorIdx+1)+"F");
-                    let isSelected = currentSelectedId === curId;
-                    
-                    let color = isSelected ? "#fbbc05" : obj.color;
+                    let color = (currentSelectedId === curId) ? "#fbbc05" : obj.color;
                     
                     let vertices = [
-                        {x: obj.x, y: hOffset, z: obj.z},
-                        {x: obj.x + obj.w, y: hOffset, z: obj.z},
-                        {x: obj.x + obj.w, y: hOffset + h, z: obj.z},
-                        {x: obj.x, y: hOffset + h, z: obj.z},
-                        {x: obj.x, y: hOffset, z: obj.z + obj.d},
-                        {x: obj.x + obj.w, y: hOffset, z: obj.z + obj.d},
-                        {x: obj.x + obj.w, y: hOffset + h, z: obj.z + obj.d},
-                        {x: obj.x, y: hOffset + h, z: obj.z + obj.d}
+                        {x: obj.x, y: hOffset, z: obj.z}, {x: obj.x + obj.w, y: hOffset, z: obj.z},
+                        {x: obj.x + obj.w, y: hOffset + h, z: obj.z}, {x: obj.x, y: hOffset + h, z: obj.z},
+                        {x: obj.x, y: hOffset, z: obj.z + obj.d}, {x: obj.x + obj.w, y: hOffset, z: obj.z + obj.d},
+                        {x: obj.x + obj.w, y: hOffset + h, z: obj.z + obj.d}, {x: obj.x, y: hOffset + h, z: obj.z + obj.d}
                     ];
-                    
                     let proj = vertices.map(v => project(v.x, v.y, v.z));
-                    let faces = [, [1, 5, 6, 2], [5, 4, 7, 6],
-, [3, 2, 6, 7], [4, 5, 1, 0]
-                    ];
+                    let faces = [[0,1,2,3], [1,5,6,2], [5,4,7,6], [4,0,3,7], [3,2,6,7], [4,5,1,0]];
                     
                     faces.forEach(face => {
-                        ctx.beginPath();
-                        ctx.moveTo(proj[face[0]].x, proj[face[0]].y);
+                        ctx.beginPath(); ctx.moveTo(proj[face[0]].x, proj[face[0]].y);
                         for(let i=1; i<4; i++) ctx.lineTo(proj[face[i]].x, proj[face[i]].y);
-                        ctx.closePath();
-                        ctx.fillStyle = color;
-                        ctx.fill();
-                        ctx.strokeStyle = "#ffffff";
-                        ctx.lineWidth = 1;
-                        ctx.stroke();
+                        ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+                        ctx.strokeStyle = "#ffffff"; ctx.stroke();
                     });
-                    
                     return { id: curId, proj: proj };
                 }
 
                 let drawnElements = [];
                 function render() {
                     ctx.clearRect(0, 0, width, height);
-                    
-                    // 背景の地面
-                    ctx.fillStyle = "#88cc66";
-                    ctx.fillRect(0, 0, width, height);
-                    
+                    ctx.fillStyle = "#88cc66"; ctx.fillRect(0, 0, width, height);
                     drawnElements = [];
                     objects.forEach(obj => {
-                        for(let f=0; f<obj.floors; f++) {
-                            let el = drawCube(ctx, obj, f);
-                            drawnElements.push(el);
-                        }
+                        for(let f=0; f<obj.floors; f++) drawnElements.push(drawCube(ctx, obj, f));
                     });
                 }
 
@@ -144,138 +212,108 @@
                 window.addEventListener('mouseup', () => isDragging = false);
                 container.addEventListener('mousemove', e => {
                     if (!isDragging) return;
-                    let deltaX = e.clientX - previousMousePosition.x;
-                    let deltaY = e.clientY - previousMousePosition.y;
-                    angleY += deltaX * 0.01;
-                    angleX += deltaY * 0.01;
-                    previousMousePosition = { x: e.clientX, y: e.clientY };
-                    render();
+                    angleY += (e.clientX - previousMousePosition.x) * 0.01;
+                    angleX += (e.clientY - previousMousePosition.y) * 0.01;
+                    previousMousePosition = { x: e.clientX, y: e.clientY }; render();
                 });
                 
                 container.addEventListener('click', e => {
                     let rect = canvas.getBoundingClientRect();
-                    let clickX = e.clientX - rect.left;
-                    let clickY = e.clientY - rect.top;
-                    
-                    // 簡易クリック判定（上にある階層から優先）
+                    let clickX = e.clientX - rect.left, clickY = e.clientY - rect.top;
                     for(let i = drawnElements.length - 1; i >= 0; i--) {
                         let el = drawnElements[i];
                         let xs = el.proj.map(p => p.x), ys = el.proj.map(p => p.y);
-                        let minX = Math.min(...xs), maxX = Math.max(...xs);
-                        let minY = Math.min(...ys), maxY = Math.max(...ys);
-                        
-                        if(clickX >= minX && clickX <= maxX && clickY >= minY && clickY <= maxY) {
-                            currentSelectedId = el.id;
-                            render();
-                            if(window.updateInfo) window.updateInfo(el.id);
-                            break;
+                        if(clickX >= Math.min(...xs) && clickX <= Math.max(...xs) && clickY >= Math.min(...ys) && clickY <= Math.max(...ys)) {
+                            currentSelectedId = el.id; render(); updateInfo(el.id); break;
                         }
                     }
                 });
-
-                window.addEventListener('resize', () => {
-                    width = canvas.width = container.clientWidth;
-                    height = canvas.height = container.clientHeight;
-                    render();
-                });
-
+                window.addEventListener('resize', () => { width = canvas.width = container.clientWidth; height = canvas.height = container.clientHeight; render(); });
                 render();
             }
         };
-        
         let currentSelectedId = null;
-        window.addEventListener('DOMContentLoaded', () => {
-            ThreeShim.createScene(document.getElementById('canvas-container'));
-        });
-        // --- すべての棟・すべての階のデータを完全網羅 ---
-        const floorData = {
-            "PP棟-1F": { title: "PP棟 (幼稚園) 1階", rooms: [ {n:"玄関ホール", e:"天窓のある明るいバリアフリーエントランス"}, {n:"保健室", e:"可動式間仕切りの広々オープンスペース"}, {n:"絵本のお部屋", e:"畳敷きのゆったり読書空間"}, {n:"光庭", e:"高さ2m、243個の岩があるロッククライミング"}, {n:"遊戯室", e:"約180㎡の可動式ステージ付きホール"}, {n:"棚田・ビオトープ", e:"自然と触れ合える体験スペース"} ] },
-            
-            "P棟-1F": { title: "P棟 (小学校) 1階", rooms: [ {n:"エントランス", e:"吹き抜けの開放的な空間"}, {n:"木の教室", e:"木の温かみがあるオープンスペース"}, {n:"教員ステーション", e:"職員室の小さな出張所"}, {n:"図書館", e:"琉球畳敷きスペースのある読書エリア"}, {n:"理科室", e:"児童に合わせた高さ65cmの実験台"} ] },
-            
-            "M棟-4F": { title: "M棟 4階", rooms: [ {n:"M3A", e:"クラス出し物"}, {n:"M3B", e:"クラス出し物"}, {n:"M3C", e:"クラス出し物"}, {n:"M3D", e:"クラス出し物"} ] },
-            "M棟-3F": { title: "M棟 3階", rooms: [ {n:"M4A", e:"クラス出し物"}, {n:"M4B", e:"クラス出し物"}, {n:"M4C", e:"クラス出し物"}, {n:"M4D", e:"クラス出し物"}, {n:"M4E", e:"クラス出し物"}, {n:"3階教室", e:"黒板が両端から見えやすい湾曲設計"} ] },
-            "M棟-2F": { title: "M棟 2階", rooms: [ {n:"M1A", e:"クラス出し物"}, {n:"M1B", e:"クラス出し物"}, {n:"M2A", e:"クラス出し物"}, {n:"M2B", e:"クラス出し物"}, {n:"シンボルツリー", e:"円形ベンチと大きなケヤキの木"} ] },
-            "M棟-1F": { title: "M棟 1階", rooms: [ {n:"ダイニング", e:"明るく開放感のある250席の食堂・食品販売"}, {n:"厨房", e:"1日最大1500食調理可能なキッチン"}, {n:"作法室", e:"お茶を点てられる21畳の本格和室"}, {n:"渡り廊下", e:"光が当たると幻想的なレインボー通路"} ] },
-            
-            "C棟-4F": { title: "C棟 4階", rooms: [ {n:"音楽室", e:"ドラムセットやクラシックギター、ICT機材完備"}, {n:"探究ルーム", e:"全壁面がホワイトボードのアクティブラーニング教室"} ] },
-            "C棟-3F": { title: "C棟 3階", rooms: [ {n:"地学実験室", e:"岩石標本や太陽望遠鏡、天球儀"}, {n:"化学実験室2", e:"ドラフトチャンバー（有害気体排気装置）"}, {n:"生物実験室", e:"顕微鏡を使いやすい一番明るい部屋"}, {n:"物理実験室", e:"データロガーやPC、各種実験器具"} ] },
-            "C棟-2F": { title: "C棟 2階", rooms: [ {n:"サイエンスホール", e:"『言万葉の絵樹』が描かれた美しい吹き抜け空間"} ] },
-            "C棟-1F": { title: "C棟 1階", rooms: [ {n:"ライブラリー", e:"5万冊収蔵予定、カフェ風の耐震設計図書室"} ] },
+        window.addEventListener('DOMContentLoaded', () => { ThreeShim.createScene(document.getElementById('canvas-container')); loadStatusData(); });
 
-            "Y棟-5F": { title: "Y棟 5階", alert: "⚠️ 5階（天体観測ドームなど）は立ち入り禁止やで！" },
-            "Y棟-4F": { title: "Y棟 4階", rooms: [ {n:"Y3A", e:"クラス出し物"}, {n:"Y3B", e:"クラス出し物"}, {n:"Y3C", e:"クラス出し物"}, {n:"Y3D", e:"クラス出し物"} ] },
-            "Y棟-3F": { title: "Y棟 3階", rooms: [ {n:"Y2A", e:"クラス出し物"}, {n:"Y2B", e:"クラス出し物"}, {n:"Y2C", e:"クラス出し物"}, {n:"Y2D", e:"クラス出し物"} ] },
-            "Y棟-2F": { title: "Y棟 2階", rooms: [ {n:"Y1A", e:"クラス出し物"}, {n:"Y1B", e:"クラス出し物"}, {n:"Y1C", e:"クラス出し物"}, {n:"Y1D", e:"クラス出し物"}, {n:"Y棟教室", e:"全室南向きで明るく広々とした空間"} ] },
-            "Y棟-1F": { title: "Y棟 1階", rooms: [ {n:"MY体育館", e:"冷暖房完備！バスケットコート2面分の大型体育館・ステージ発表"}, {n:"受付ロビー", e:"パンフレット配布・総合案内"} ] },
-            
-            "グラウンド": { title: "総合グラウンド", rooms: [ {n:"模擬店エリア", e:"各種クラス・部活の模擬店テント"}, {n:"サッカー場", e:"天然芝の広大なフィールド"}, {n:"陸上トラック", e:"周回480mのタータントラック"}, {n:"テニスコート", e:"オムニコート6面・壁打ち練習場"}, {n:"クラブハウス", e:"屋根付きの南側観覧席"} ] }
+        // --- 校内施設データ ---
+        const floorData = {
+            "PP棟-1F": { title: "PP棟 (幼稚園) 1階", rooms: [ {n:"玄関ホール", e:"天窓のあるエントランス"}, {n:"絵本のお部屋", e:"畳敷きの読書空間"} ] },
+            "P棟-1F": { title: "P棟 (小学校) 1階", rooms: [ {n:"エントランス", e:"開放的な空間"}, {n:"図書館", e:"琉球畳敷きエリア"} ] },
+            "M棟-4F": { title: "M棟 4階", rooms: [ {n:"M3A", e:"クラス出し物"}, {n:"M3B", e:"クラス出し物"}, {n:"M3C", e:"クラス出し物"}, {n:"M3D", e:"クラス出し物"} ] },
+            "M棟-3F": { title: "M棟 3階", rooms: [ {n:"M4A", e:"出し物"}, {n:"M4B", e:"出し物"}, {n:"M4C", e:"出し物"}, {n:"M4D", e:"出し物"}, {n:"M4E", e:"出し物"} ] },
+            "M棟-2F": { title: "M棟 2階", rooms: [ {n:"M1A", e:"出し物"}, {n:"M1B", e:"出し物"}, {n:"M2A", e:"出し物"}, {n:"M2B", e:"出し物"} ] },
+            "M棟-1F": { title: "M棟 1階", rooms: [ {n:"ダイニング", e:"250席の食堂・食品販売"}, {n:"作法室", e:"21畳の本格和室"} ] },
+            "C棟-4F": { title: "C棟 4階", rooms: [ {n:"音楽室", e:"楽器・ICT機材"}, {n:"探究ルーム", e:"全面ホワイトボード教室"} ] },
+            "C棟-3F": { title: "C棟 3階", rooms: [ {n:"地学実験室", e:"太陽望遠鏡など"}, {n:"化学実験室2", e:"ドラフトチャンバー"}, {n:"生物実験室", e:"明るい顕微鏡室"}, {n:"物理実験室", e:"各種実験器具"} ] },
+            "C棟-2F": { title: "C棟 2階", rooms: [ {n:"サイエンスホール", e:"吹き抜け空間"} ] },
+            "C棟-1F": { title: "C棟 1階", rooms: [ {n:"ライブラリー", e:"カフェ風の耐震設計図書室"} ] },
+            "Y棟-5F": { title: "Y棟 5階", alert: "⚠️ 5階は立ち入り禁止やで！" },
+            "Y棟-4F": { title: "Y棟 4階", rooms: [ {n:"Y3A", e:"出し物"}, {n:"Y3B", e:"出し物"}, {n:"Y3C", e:"出し物"}, {n:"Y3D", e:"出し物"} ] },
+            "Y棟-3F": { title: "Y棟 3階", rooms: [ {n:"Y2A", e:"出し物"}, {n:"Y2B", e:"出し物"}, {n:"Y2C", e:"出し物"}, {n:"Y2D", e:"出し物"} ] },
+            "Y棟-2F": { title: "Y棟 2階", rooms: [ {n:"Y1A", e:"出し物"}, {n:"Y1B", e:"出し物"}, {n:"Y1C", e:"出し物"}, {n:"Y1D", e:"出し物"} ] },
+            "Y棟-1F": { title: "Y棟 1階", rooms: [ {n:"MY体育館", e:"大型体育館・ステージ発表"}, {n:"受付ロビー", e:"総合案内"} ] },
+            "グラウンド": { title: "総合グラウンド", rooms: [ {n:"模擬店エリア", e:"各種模擬店テント"}, {n:"サッカー場", e:"天然芝フィールド"} ] }
         };
 
-        // 情報更新
         function updateInfo(id) {
             const data = floorData[id];
-            const infoContent = document.getElementById('info-content');
+            const panel = document.getElementById('info-content-3d');
             if (!data) return;
-
             if (data.alert) {
-                infoContent.innerHTML = `
-                    <div class="floor-title">${data.title}</div>
-                    <div class="danger-box">${data.alert}</div>
-                `;
+                panel.innerHTML = `<div class="floor-title">${data.title}</div><div class="danger-box">${data.alert}</div>`;
             } else {
                 let html = `<div class="floor-title">${data.title} 一覧</div><div class="room-grid">`;
-                data.rooms.forEach(r => {
-                    html += `
-                        <div class="room-card">
-                            <div class="room-name">${r.n}</div>
-                            <div class="event-name">${r.e}</div>
-                        </div>
-                    `;
-                });
-                html += `</div>`;
-                infoContent.innerHTML = html;
+                data.rooms.forEach(r => { html += `<div class="room-card"><div class="room-name">${r.n}</div><div class="event-name">${r.e}</div></div>`; });
+                panel.innerHTML = html + `</div>`;
             }
         }
 
-        // 検索機能
+        // 検索システム
         function searchEvent() {
             const query = document.getElementById('search-input').value.toLowerCase().trim();
-            const infoContent = document.getElementById('info-content');
-            
-            if (query === "") {
-                infoContent.innerHTML = `<p style="text-align: center; color: #666; margin-top: 20px;">上の3Dマップを動かして、見たい校舎の階やグラウンドをタップしてな！</p>`;
-                return;
-            }
-
-            let resultsHtml = `<div class="floor-title">🔍 「${query}」の検索結果</div><div class="room-grid">`;
-            let found = false;
-
+            const panel = document.getElementById('info-content-search');
+            if (query === "") { panel.innerHTML = `<p style="text-align: center; color: #666;">ここに検索結果が表示されるで！</p>`; return; }
+            let html = `<div class="room-grid">`, found = false;
             for (let id in floorData) {
-                const data = floorData[id];
-                if (data.rooms) {
-                    data.rooms.forEach(r => {
+                if (floorData[id].rooms) {
+                    floorData[id].rooms.forEach(r => {
                         if (r.n.toLowerCase().includes(query) || r.e.toLowerCase().includes(query)) {
-                            resultsHtml += `
-                                <div class="room-card" style="border: 2px solid #1a73e8;">
-                                    <div class="room-name">${r.n}</div>
-                                    <div class="event-name">${r.e}</div>
-                                    <div style="font-size:0.75rem; color:#1a73e8; margin-top:5px; font-weight:bold;">📍 ${data.title}</div>
-                                </div>
-                            `;
+                            html += `<div class="room-card" style="border: 2px solid #1a73e8;"><div class="room-name">${r.n}</div><div class="event-name">${r.e}</div><div style="font-size:0.75rem; color:#1a73e8; margin-top:5px; font-weight:bold;">📍 ${floorData[id].title}</div></div>`;
                             found = true;
                         }
                     });
                 }
             }
-            resultsHtml += `</div>`;
+            panel.innerHTML = found ? html + `</div>` : `<p style="text-align: center; color: #dc3545; font-weight:bold;">見つからへんでした。</p>`;
+        }
 
-            if (!found) {
-                infoContent.innerHTML = `<div class="floor-title">🔍 検索結果</div><p style="text-align: center; color: #dc3545; font-weight:bold;">該当する出し物や教室が見つからへんでした。</p>`;
+        // --- 🟢 管理データ（リアルタイム進行情報）の自動読み込み 🟢 ---
+        function loadStatusData() {
+            // 管理サイトが保存した最新データをブラウザの共通保存領域から1秒おきにチェックします
+            setInterval(() => {
+                const pStatus = JSON.parse(localStorage.getItem('bunkasai_status_p')) || { current:"演劇発表 A", next:"吹奏楽部コンサート", type:"none", val:0 };
+                const myStatus = JSON.parse(localStorage.getItem('bunkasai_status_my')) || { current:"ダンス部パフォーマンス", next:"軽音楽部LIVE", type:"plus", val:10 };
+
+                updateStatusUI('p', pStatus);
+                updateStatusUI('my', myStatus);
+            }, 1000);
+        }
+
+        function updateStatusUI(prefix, data) {
+            document.getElementById(prefix + '-current').innerText = data.current;
+            document.getElementById(prefix + '-next').innerText = "次： " + data.next;
+            
+            const badge = document.getElementById(prefix + '-badge');
+            badge.className = "delay-badge";
+            
+            if (data.type === "plus") {
+                badge.innerText = `⚠️ ${data.val} 分遅れ`;
+                badge.classList.add('delay-plus');
+            } else if (data.type === "minus") {
+                badge.innerText = `⏱️ ${data.val} 分巻進行`;
+                badge.classList.add('delay-minus');
             } else {
-                infoContent.innerHTML = resultsHtml;
+                badge.innerText = "⏳ オンタイム";
+                badge.className = "delay-badge delay-none";
             }
         }
-    </script>
-</body>
-</html>
